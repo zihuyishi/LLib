@@ -47,11 +47,13 @@ namespace LLib {
 			p = new point(ptr);
 		}
 		LPtr& operator=(const LPtr &ptr) {
-			if (p != ptr.p) {
+			if (p && p != ptr.p) {
 				p->Release();
 			}
 			p = ptr.p;
-			p->AddRef();
+			if (p) {
+				p->AddRef();
+			}
 			return *this;
 		}
 		

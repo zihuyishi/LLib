@@ -66,7 +66,8 @@ namespace LLib {
 		LStringT(Tchar *str) {
 			_str = make_LPtr(bstring(str));
 		}
-		LStringT(const tstring &str) {
+		LStringT(const tstring &str)
+		{
 			_str = str._str;
 		}
 		tstring& operator=(const tstring &str) {
