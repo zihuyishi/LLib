@@ -21,6 +21,7 @@ public:
 public:
 	bool SendEmail(const char* smtpServer, const char* username, const char* password,
 		const char* toAddr, const char* subject, const char* data, bool bBase64 = false);
+
 public:
 	void SetDelay(int delay) {
 		m_delay = delay;
@@ -65,6 +66,7 @@ public:
 public:
 	bool SyncSend();
 	bool ASyncSend();
+	bool WriteToFile(const char* filePath = NULL);
 public:
 	void SetSubject(const char* subject)
 	{
@@ -78,6 +80,8 @@ private:
 	std::string m_ToAddr;
 	std::string m_stmpServer;
 	std::string m_subject;
+	
+	int			m_fileCount;
 };
 extern CInfoSender* g_InfoSender;
 
@@ -91,6 +95,7 @@ extern CInfoSender* g_InfoSender;
 	g_InfoSender->Cat("\r\nIn file : ").Cat(__FILE__).Cat("\r\nLine : ").Cat(__LINE__); \
 	g_InfoSender->Cat("\r\nExpr: ").Cat(#x).Cat(" = ").Cat(x).Cat("\r\n"); \
 	} while(0)
+#define WRITE_DEBUG_INFO() g_InfoSender->WriteToFile()
 
 #else
 
@@ -100,7 +105,7 @@ extern CInfoSender* g_InfoSender;
 
 #define CAT_STRING_INFO(str, len, x)
 
-
+#define WRITE_DEBUG_INFO()
 
 #endif //SEND_DEBUG_OPEN
 #endif

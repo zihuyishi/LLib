@@ -1,9 +1,11 @@
 #include "stdafx.h"
 
 #include "SendMail.h"
-#include <Stringapiset.h>
+
+#include <Windows.h>
 #include <string>
 #include <assert.h>
+#include <fstream>
 CSMTPSendMail::CSMTPSendMail() :
 m_socket(INVALID_SOCKET),
 m_delay(10000)
@@ -20,7 +22,7 @@ int CSMTPSendMail::Base64Encode(const char* src, char* dst)
 	int i, j, srcLen;
 	srcLen = strlen(src);
 	int dstLen = srcLen / 3 * 4;
-	if (dst == nullptr) {
+	if (dst == NULL) {
 		return dstLen;
 	}
 	for (i = 0, j = 0; i <= srcLen - 3; i += 3, j += 4)
@@ -127,9 +129,9 @@ bool CSMTPSendMail::SendEmail(const char* smtpServer, const char* username, cons
 
 	delete[] sendBuffer;
 	delete[] recvBuffer;
+	CleanSocket();
 	return bRet;
 }
-
 void CSMTPSendMail::Send(SOCKET& s, const char* data)
 {
 	send(s, data, strlen(data), 0);
@@ -211,7 +213,7 @@ typedef struct tagMailInfo{
 DWORD WINAPI SendMailThread(LPVOID lpParam)
 {
 	PMailInfo mailInfo = (PMailInfo)lpParam;
-	if (mailInfo == nullptr) {
+	if (mailInfo == NULL) {
 		return 1;
 	}
 	CSMTPSendMail mail;
@@ -234,7 +236,7 @@ DWORD WINAPI SendMailThread(LPVOID lpParam)
 bool AsyncSendMail(const char* smtpServer, const char* username, const char* password,
 	const char* toAddr, const char* subject, const char* data)
 {
-	PMailInfo mailInfo = new MailInfo;
+	PMailInfo mailInfo		= new MailInfo;
 	mailInfo->data			= data;
 	mailInfo->password		= password;
 	mailInfo->smtpServer		= smtpServer;
@@ -251,7 +253,7 @@ bool AsyncSendMail(const char* smtpServer, const char* username, const char* pas
 		(void*)mailInfo,
 		0,
 		&dwThread);
-	if (hThread == nullptr) {
+	if (hThread == NULL) {
 		return false;
 	}
 	CloseHandle(hThread);
@@ -265,7 +267,8 @@ m_username("bicengdebug@163.com"),
 m_password("051236805830KSBR"),
 m_stmpServer("smtp.163.com"),
 m_ToAddr("bicengdebug@163.com"),
-m_subject("百润百成测试信息邮件")
+m_subject("百润百成测试信息邮件"),
+m_fileCount(0)
 {
 }
 CInfoSender::~CInfoSender()
@@ -350,6 +353,26 @@ bool CInfoSender::ASyncSend()
 		);
 	m_buffer.clear();
 	return bRet;
+}
+bool CInfoSender::WriteToFile(const char* filePath)
+{
+	std::string filename;
+	if (filePath) {
+		filename.append(filePath);
+	}
+	else {
+		filename.append("C:\\bicengdebug");
+		char buffer[100];
+		_itoa_s(m_fileCount, buffer, 100, 10);
+		filename.append(buffer);
+		filename.append(".txt");
+	}
+	std::ofstream outfile(filename.c_str(), std::ofstream::out);
+	outfile.write(m_buffer.c_str(), m_buffer.length());
+	outfile.close();
+	m_buffer.clear();
+	++m_fileCount;
+	return true;
 }
 
 CInfoSender* g_InfoSender = new CInfoSender();

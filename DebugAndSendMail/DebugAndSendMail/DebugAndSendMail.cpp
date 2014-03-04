@@ -2,7 +2,7 @@
 //
 
 #include "stdafx.h"
-#define SEND_DEBUG_OPEN
+
 #include "SendMail.h"
 #include <iostream>
 int _tmain(int argc, _TCHAR* argv[])
@@ -14,12 +14,14 @@ int _tmain(int argc, _TCHAR* argv[])
 	CAT_STRING_INFO(iValue);
 	CAT_STRING_INFO("This is the first Line");
 	CAT_STRING_INFO("这就是传说中的第二行");
-	SEND_DEBUG_INFO();
+	//SEND_DEBUG_INFO();
+	WRITE_DEBUG_INFO();
 
 	ADD_DEBUG_INFO("第二封邮件");
 	CAT_STRING_INFO("This is the first Line");
 	CAT_STRING_INFO("这次又是第二行");
-	SEND_DEBUG_INFO();
+	//SEND_DEBUG_INFO();
+	WRITE_DEBUG_INFO();
 	std::cout << "发送完毕" << std::endl;
 	int i;
 	std::cin >> i;
