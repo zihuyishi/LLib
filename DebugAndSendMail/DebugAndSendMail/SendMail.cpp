@@ -58,7 +58,7 @@ bool CSMTPSendMail::SendEmail(const char* smtpServer, const char* username, cons
 	const char* toAddr, const char* subject, const char* data, bool bBase64)
 {
 	bool bRet = true;
-	bRet = InitSocket(smtpServer, "25");
+	bRet = InitSocket(smtpServer, m_port);
 	if (!bRet) {
 		return bRet;
 	}
@@ -75,12 +75,7 @@ bool CSMTPSendMail::SendEmail(const char* smtpServer, const char* username, cons
 		Send(m_socket, ("auth login\r\n"));
 		Recv(m_socket, recvBuffer, BufferLen);
 
-		if (!bBase64) {
-			Base64Encode(username, sendBuffer);
-		}
-		else {
-			strcpy_s(sendBuffer, BufferLen, username);
-		}
+		Base64Encode(username, sendBuffer);
 		strcat_s(sendBuffer, BufferLen, "\r\n");
 		Send(m_socket, sendBuffer);
 
@@ -110,8 +105,7 @@ bool CSMTPSendMail::SendEmail(const char* smtpServer, const char* username, cons
 		Send(m_socket, sendBuffer);
 		Recv(m_socket, recvBuffer, BufferLen);
 
-		StringCchPrintfA(sendBuffer, BufferLen, "%s%s%s",
-			"rcpt to:<", toAddr, ">\r\n");
+		StringCchPrintfA(sendBuffer, BufferLen, "rcpt to:<%s>\r\n", toAddr);
 		Send(m_socket, sendBuffer);
 		Recv(m_socket, recvBuffer, BufferLen);
 
@@ -198,7 +192,7 @@ bool SyncSendMail(const char* smtpServer, const char* username, const char* pass
 	const char* toAddr, const char* subject, const char* data)
 {
 	CSMTPSendMail mail;
-	return mail.SendEmail(smtpServer, username, password, toAddr, subject, data);
+	return mail.SendEmail(smtpServer, username, password, toAddr, subject, data, true);
 }
 
 using std::string;
@@ -209,6 +203,7 @@ typedef struct tagMailInfo{
 	string toAddr;
 	string subject;
 	string data;
+	HANDLE finishEvent;
 }MailInfo, *PMailInfo;
 DWORD WINAPI SendMailThread(LPVOID lpParam)
 {
@@ -223,8 +218,11 @@ DWORD WINAPI SendMailThread(LPVOID lpParam)
 		mailInfo->toAddr.c_str(),
 		mailInfo->subject.c_str(),
 		mailInfo->data.c_str(),
-		false
+		true
 		);
+	if (mailInfo->finishEvent) {
+		::SetEvent(mailInfo->finishEvent);
+	}
 	delete mailInfo;
 	if (bRet) {
 		return 0;
@@ -234,7 +232,7 @@ DWORD WINAPI SendMailThread(LPVOID lpParam)
 	}
 }
 bool AsyncSendMail(const char* smtpServer, const char* username, const char* password,
-	const char* toAddr, const char* subject, const char* data)
+	const char* toAddr, const char* subject, const char* data, HANDLE finishEvent)
 {
 	PMailInfo mailInfo		= new MailInfo;
 	mailInfo->data			= data;
@@ -243,6 +241,7 @@ bool AsyncSendMail(const char* smtpServer, const char* username, const char* pas
 	mailInfo->subject		= subject;
 	mailInfo->toAddr			= toAddr;
 	mailInfo->username		= username;
+	mailInfo->finishEvent	= finishEvent;
 
 	HANDLE hThread;
 	DWORD dwThread;
@@ -264,22 +263,41 @@ CInfoSender::CInfoSender() :
 CInfoSenderA(*this), 
 CInfoSenderB(*this),
 m_username("bicengdebug@163.com"),
-m_password("051236805830KSBR"),
+m_password("MDUxMjM2ODA1ODMwS1NCUg=="),
 m_stmpServer("smtp.163.com"),
 m_ToAddr("bicengdebug@163.com"),
 m_subject("百润百成测试信息邮件"),
-m_fileCount(0)
+m_fileCount(0),
+m_hEvent(NULL)
 {
+	m_hBufferMutex = ::CreateMutex(
+		NULL,
+		FALSE,
+		NULL);
+	m_hUserMutex = ::CreateMutex(
+		NULL,
+		FALSE,
+		NULL);
 }
 CInfoSender::~CInfoSender()
 {
+	if (m_hEvent) {
+		CloseHandle(m_hEvent);
+	}
+	if (m_hBufferMutex) {
+		CloseHandle(m_hBufferMutex);
+	}
+	if (m_hUserMutex) {
+		CloseHandle(m_hUserMutex);
+	}
 }
 CInfoSender& CInfoSender::AddInfo(const char* info)
 {
 	assert(info != 0);
-	m_buffer.append("\r\n");
-	m_buffer.append(info);
-	m_buffer.append("\r\n");
+	std::string tmp("\r\n");
+	tmp.append(info);
+	tmp.append("\r\n");
+	bufferLockedAppend(tmp.c_str());
 	return *this;
 }
 CInfoSender& CInfoSender::AddInfo(const wchar_t* info)
@@ -308,13 +326,13 @@ CInfoSender& CInfoSender::Cat(long lValue)
 {
 	char lBuffer[40];
 	_ltoa_s(lValue, lBuffer, 40, 10);
-	m_buffer.append(lBuffer);
+	bufferLockedAppend(lBuffer);
 	return *this;
 }
 CInfoSender& CInfoSender::Cat(const char* strValue)
 {
 	assert(strValue != 0);
-	m_buffer.append(strValue);
+	bufferLockedAppend(strValue);
 	return *this;
 }
 CInfoSender& CInfoSender::Cat(const wchar_t* wcsValue)
@@ -325,7 +343,7 @@ CInfoSender& CInfoSender::Cat(const wchar_t* wcsValue)
 	char* lpTmp = new char[nLen + 1];
 	WideCharToMultiByte(CP_OEMCP, NULL,
 		wcsValue, -1, lpTmp, nLen, NULL, FALSE);
-	m_buffer.append(lpTmp);
+	bufferLockedAppend(lpTmp);
 	delete[] lpTmp;
 	return *this;
 }
@@ -339,20 +357,46 @@ bool CInfoSender::SyncSend()
 		m_subject.c_str(),
 		m_buffer.c_str()
 		);
-	m_buffer.clear();
+	bufferLockedClear();
 	return bRet;
 }
 bool CInfoSender::ASyncSend()
 {
+	if (m_hEvent) {
+		WaitSendEnd();
+	}
+	m_hEvent = ::CreateEvent(
+		NULL,
+		TRUE,
+		FALSE,
+		TEXT("SendMailEvent")
+		);
 	bool bRet = AsyncSendMail(m_stmpServer.c_str(),
 		m_username.c_str(),
 		m_password.c_str(),
 		m_ToAddr.c_str(),
 		m_subject.c_str(),
-		m_buffer.c_str()
+		m_buffer.c_str(),
+		m_hEvent
 		);
-	m_buffer.clear();
+	bufferLockedClear();
 	return bRet;
+}
+bool CInfoSender::WaitSendEnd(int iTime)
+{
+	if (m_hEvent) {
+		DWORD dwRet = ::WaitForSingleObject(m_hEvent, iTime);
+		::CloseHandle(m_hEvent);
+		m_hEvent = NULL;
+		switch (dwRet)
+		{
+		case WAIT_OBJECT_0:
+			return true;
+		default:
+			return false;
+		}
+	}
+	return true;
 }
 bool CInfoSender::WriteToFile(const char* filePath)
 {
@@ -370,9 +414,64 @@ bool CInfoSender::WriteToFile(const char* filePath)
 	std::ofstream outfile(filename.c_str(), std::ofstream::out);
 	outfile.write(m_buffer.c_str(), m_buffer.length());
 	outfile.close();
-	m_buffer.clear();
+	bufferLockedClear();
+
 	++m_fileCount;
 	return true;
 }
+//mutex for user
+CInfoSender& CInfoSender::SetUserLock()
+{
+	DWORD dwRet = WaitForSingleObject(
+		m_hUserMutex,
+		INFINITE);
+	switch (dwRet)
+	{
+	case WAIT_OBJECT_0:
+		break;
+	case WAIT_ABANDONED:
+		break;
+	}
+	return *this;
+}
+CInfoSender& CInfoSender::ReleaseUserLock()
+{
+	::ReleaseMutex(m_hUserMutex);
+	return *this;
+}
+//private method
+bool CInfoSender::bufferLockedAppend(const char* str)
+{
+	DWORD dwRet = ::WaitForSingleObject(
+		m_hBufferMutex,
+		INFINITE);
+	switch (dwRet)
+	{
+	case WAIT_OBJECT_0:
+		m_buffer.append(str);
+		::ReleaseMutex(m_hBufferMutex);
+		break;
+	case WAIT_ABANDONED:
+		return false;
+	}
+	return true;
+}
+bool CInfoSender::bufferLockedClear()
+{
+	DWORD dwRet = ::WaitForSingleObject(
+		m_hBufferMutex,
+		INFINITE);
+	switch (dwRet)
+	{
+	case WAIT_OBJECT_0:
+		m_buffer.clear();
+		::ReleaseMutex(m_hBufferMutex);
+		break;
+	case WAIT_ABANDONED:
+		return false;
+	}
+	return true;
+}
 
+//Create global CInfoSender instance
 CInfoSender* g_InfoSender = new CInfoSender();

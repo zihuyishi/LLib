@@ -32,10 +32,10 @@
     <ClCompile Include="stdafx.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
-    <ClCompile Include="DebugAndSendMail.cpp">
+    <ClCompile Include="SendMail.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
-    <ClCompile Include="SendMail.cpp">
+    <ClCompile Include="UnitTest.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
   </ItemGroup>
