@@ -3,6 +3,8 @@
 #include <cassert>
 #include <cstdlib>
 #include <ctime>
+#include <chrono>
+using namespace std::chrono;
 
 int main(int , char **)
 {
@@ -17,13 +19,29 @@ int main(int , char **)
 
     std::srand(std::time(0));
 
-    for (auto i = 0; i < 20; i++) {
-        tree.set(std::rand() % 200, std::rand() % 1000);
+    int large = 2000000;
+    auto t1 = std::chrono::steady_clock::now();
+    for (auto i = 0; i < large; i++) {
+        tree.set(std::rand() % large, 1000);
     }
 
-    tree.enumerate([](const int key, double& value) {
-        std::cout << key << " : " << value << std::endl;
-    });
+    auto interval = duration_cast<milliseconds>(steady_clock::now() - t1).count();
+    std::cout << "insert cost " << interval << std::endl;
 
+    std::cout << "tree size : " << tree.size() << std::endl;
+
+    t1 = steady_clock::now();
+    tree.enumerate([](const int key, double& value) {
+        double v = value;
+    });
+    interval = duration_cast<milliseconds>(steady_clock::now() - t1).count();
+    std::cout << "enumerate cost " << interval << std::endl;
+
+    t1 = steady_clock::now();
+    for (auto i = 0; i < large; i++) {
+        tree.exist(i);
+    }
+    interval = duration_cast<milliseconds>(steady_clock::now() - t1).count();
+    std::cout << "find cost " << interval << std::endl;
     return 0;
 }

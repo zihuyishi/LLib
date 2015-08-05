@@ -111,7 +111,6 @@ public:
 
 private:
     _node_type* _find(const K& key) const;
-    void _insert(_node_type *node);
 private:
    _node_type   *m_root = nullptr; 
    unsigned long m_size = 0;
@@ -120,12 +119,37 @@ private:
 template <typename K, typename V>
 void BinaryTree<K, V>::set(const K& key, const V& value)
 {
-    _node_type* result = _find(key);
-    if (result != nullptr) {
-        result->value = value;
-    } else {
-        _insert(new _node_type(key, value));
+    m_size++;
+    if (m_root == nullptr) {
+        m_root = new _node_type(key, value);
+        return ;
     }
+    _node_type *currentNode = m_root;
+    do {
+        if (key < currentNode->key) {
+            if (currentNode->left == nullptr) {
+                currentNode->setLeft(new _node_type(key, value));
+                break;
+            } else {
+                currentNode = currentNode->left;
+                continue;
+            }
+        } 
+        else if (key == currentNode->key) {
+            //just update
+            currentNode->value = value;
+            break;
+        }
+        else {
+            if (currentNode->right == nullptr) {
+                currentNode->setRight(new _node_type(key, value));
+                break;
+            } else {
+                currentNode = currentNode->right;
+                continue;
+            }
+        }
+    } while (true);
 }
 
 template <typename K, typename V>
@@ -175,36 +199,6 @@ void BinaryTree<K, V>::clear() {
     clearTree(m_root);
     m_root = nullptr;
     m_size = 0;
-}
-
-template <typename K, typename V>
-void BinaryTree<K, V>::_insert(_node_type *node)
-{
-    m_size++;
-    if (m_root == nullptr) {
-        m_root = node;
-        return ;
-    }
-    _node_type *currentNode = m_root;
-    do {
-        if (node->key < currentNode->key) {
-            if (currentNode->left == nullptr) {
-                currentNode->setLeft(node);
-                break;
-            } else {
-                currentNode = currentNode->left;
-                continue;
-            }
-        } else {
-            if (currentNode->right == nullptr) {
-                currentNode->setRight(node);
-                break;
-            } else {
-                currentNode = currentNode->right;
-                continue;
-            }
-        }
-    } while (true);
 }
 
 
