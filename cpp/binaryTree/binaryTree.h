@@ -47,23 +47,28 @@ namespace {
     template <typename K, typename V>
     void removeNode(BinaryTreeNode<K, V> *node) {
         assert(node != nullptr);
-        assert(node->parent != nullptr);
         BinaryTreeNode<K, V> *parent = node->parent;
         if (node->left == nullptr && node->right == nullptr) {
-            parent->removeChild(node);
+            if (parent) {
+                parent->removeChild(node);
+            }
             delete node;
         }
         else if (node->left == nullptr || node->right == nullptr) {
             if (node->left != nullptr) {
+                BinaryTreeNode<K, V> *tmp = node->left;
                 node->value = node->left->value;
                 node->key = node->left->key;
-                delete node->left;
-                node->left = nullptr;
+                node->right = node->right->right;
+                node->left = node->right->left;
+                delete tmp;
             } else {
+                BinaryTreeNode<K, V> *tmp = node->right;
                 node->value = node->right->value;
                 node->key = node->right->key;
-                delete node->right;
-                node->right = nullptr;
+                node->left = node->right->left;
+                node->right = node->right->right;
+                delete tmp;
             }
         }
         else {
@@ -119,9 +124,9 @@ private:
 template <typename K, typename V>
 void BinaryTree<K, V>::set(const K& key, const V& value)
 {
-    m_size++;
     if (m_root == nullptr) {
         m_root = new _node_type(key, value);
+        m_size++;
         return ;
     }
     _node_type *currentNode = m_root;
@@ -129,6 +134,7 @@ void BinaryTree<K, V>::set(const K& key, const V& value)
         if (key < currentNode->key) {
             if (currentNode->left == nullptr) {
                 currentNode->setLeft(new _node_type(key, value));
+                m_size++;
                 break;
             } else {
                 currentNode = currentNode->left;
@@ -143,6 +149,7 @@ void BinaryTree<K, V>::set(const K& key, const V& value)
         else {
             if (currentNode->right == nullptr) {
                 currentNode->setRight(new _node_type(key, value));
+                m_size++;
                 break;
             } else {
                 currentNode = currentNode->right;
@@ -176,16 +183,54 @@ void ::BinaryTree<K, V>::enumerate(std::function<void(const K& key, V& value)> f
 
 template <typename K, typename V>
 void BinaryTree<K, V>::remove(const K& key) {
-    _node_type *node = _find(key);
-    if (node != nullptr) {
+    _node_type *currentNode = _find(key);
+    if (currentNode != nullptr) {
         m_size--;
-        if (node == m_root) {
-            m_root = nullptr;
-            delete node;
-            return ;
-        }
 
-        removeNode<K, V>(node);
+        while (true) {
+            if (currentNode->left == nullptr && currentNode->right == nullptr) {
+                if (currentNode == m_root) {
+                    m_root = nullptr;
+                }
+                else {
+                    currentNode->parent->removeChild(currentNode);
+                }
+                break;
+            }
+            else if (currentNode->left == nullptr) {
+                //so right is not nullptr
+                if (currentNode == m_root) {
+                    m_root = currentNode->right;
+                    m_root->parent = nullptr;
+                } else {
+                    if (currentNode == currentNode->parent->left) {
+                        currentNode->parent->setLeft(currentNode->right);
+                    } else {
+                        currentNode->parent->setRight(currentNode->right);
+                    }
+                }
+                break;
+            }
+            else if (currentNode->right == nullptr) {
+                if (currentNode == m_root) {
+                    m_root = currentNode->left;
+                    m_root->parent = nullptr;
+                } else {
+                    if (currentNode == currentNode->parent->left) {
+                        currentNode->parent->setLeft(currentNode->left);
+                    } else {
+                        currentNode->parent->setRight(currentNode->left);
+                    }
+                }
+                break;
+            }
+            else {
+                currentNode->value = currentNode->left->value;
+                currentNode->key = currentNode->left->key;
+                currentNode = currentNode->left;
+            }
+        }
+        delete currentNode;
     }
 }
 
